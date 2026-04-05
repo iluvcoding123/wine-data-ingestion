@@ -33,6 +33,14 @@ def create_tables():
         name TEXT NOT NULL,
         product_url TEXT UNIQUE,
         description TEXT,
+        datasheet_url TEXT,
+        grape_varieties TEXT,
+        operating_temperature TEXT,
+        ageing_potential TEXT,
+        aging TEXT,
+        reserve_wines TEXT,
+        dosage TEXT,
+        crus_assembles TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (winery_id) REFERENCES wineries(id)
     );
@@ -72,25 +80,51 @@ def insert_winery(name, website_url=None):
     return winery_id
 
 
-def insert_product(winery_id, name, product_url, description=None):
+def insert_product(winery_id, product_data):
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
-    INSERT OR IGNORE INTO products (winery_id, name, product_url, description)
-    VALUES (?, ?, ?, ?)
-    """, (winery_id, name, product_url, description))
+    INSERT OR IGNORE INTO products (
+        winery_id,
+        name,
+        product_url,
+        description,
+        datasheet_url,
+        grape_varieties,
+        operating_temperature,
+        ageing_potential,
+        aging,
+        reserve_wines,
+        dosage,
+        crus_assembles
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        winery_id,
+        product_data.get("name"),
+        product_data.get("product_url"),
+        product_data.get("description"),
+        product_data.get("datasheet_url"),
+        product_data.get("grape_varieties"),
+        product_data.get("operating_temperature"),
+        product_data.get("ageing_potential"),
+        product_data.get("aging"),
+        product_data.get("reserve_wines"),
+        product_data.get("dosage"),
+        product_data.get("crus_assembles")
+    ))
 
     conn.commit()
 
     cursor.execute("""
     SELECT id FROM products WHERE product_url = ?
-    """, (product_url,))
+    """, (product_data.get("product_url"),))
     product_id = cursor.fetchone()[0]
 
     conn.close()
 
-    print(f"Inserted product: {name}")
+    print(f"Inserted product: {product_data.get('name')}")
     return product_id
 
 

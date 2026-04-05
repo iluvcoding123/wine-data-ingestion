@@ -16,9 +16,7 @@ def main():
 
     product_id = insert_product(
         winery_id,
-        product_data["name"],
-        product_data["product_url"],
-        product_data["description"]
+        product_data
     )
 
     for image_url in product_data["images"]:
