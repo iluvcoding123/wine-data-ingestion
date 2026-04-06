@@ -19,6 +19,15 @@ PRODUCT_URLS = [
     "https://www.josephperrier.com/en/champagnes-et-cuvees/la-cote-a-bras-2016/",
 ]
 
+WINERY_PAGES = {
+    "history": "https://www.josephperrier.com/en/maison/histoire/?v=0b3b97fa6688",
+    "family-spirit": "https://www.josephperrier.com/en/maison/famille/?v=0b3b97fa6688",
+    "vineyard": "https://www.josephperrier.com/en/maison/vignoble/?v=0b3b97fa6688",
+    "cellars": "https://www.josephperrier.com/en/magasin/cave-amasio/?v=0b3b97fa6688",
+    "commitment": "https://www.josephperrier.com/en/engagements/?v=0b3b97fa6688",
+    "vine-to-wine": "https://www.josephperrier.com/en/maison/savoirs-faire/?v=0b3b97fa6688",
+}
+
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "

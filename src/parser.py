@@ -94,6 +94,7 @@ def _extract_image_urls(soup, url):
     return image_urls
 
 
+
 def _extract_datasheet_url(soup):
     for link in soup.select("a[href]"):
         href = link.get("href", "")
@@ -101,6 +102,154 @@ def _extract_datasheet_url(soup):
         if ".pdf" in href.lower() or "data sheet" in text.lower():
             return href
     return None
+
+
+# ----------- WINERY PAGE HELPERS -----------
+def _extract_page_text(soup):
+    text_parts = []
+    seen = set()
+
+    selectors = [
+        ".elementor-widget-text-editor",
+        ".elementor-widget-heading",
+        "main p",
+        "main h1",
+        "main h2",
+        "main h3",
+        "main h4",
+        "main h5",
+        "main h6",
+        "main li",
+    ]
+
+    for selector in selectors:
+        for node in soup.select(selector):
+            text = _clean_text(node.get_text(" ", strip=True))
+            if not text:
+                continue
+            if len(text) < 20:
+                continue
+            if text in seen:
+                continue
+            seen.add(text)
+            text_parts.append(text)
+
+    return "\n\n".join(text_parts) if text_parts else None
+
+
+def _extract_winery_image_urls(soup, url):
+    image_urls = []
+    seen = set()
+
+    excluded_keywords = [
+        "logo",
+        "icon",
+        "facebook",
+        "instagram",
+        "linkedin",
+        "youtube",
+        "cookie",
+        "favicon",
+        "award",
+        "james-suckling",
+        "wine-enthusiast",
+        "drink-business",
+        "bettane",
+        "bernard-burtschy",
+        "decanter",
+        "dwwa",
+        "le-point",
+    ]
+
+    og_image = soup.select_one('meta[property="og:image"]')
+    if og_image and og_image.get("content"):
+        og_image_url = urljoin(url, og_image.get("content"))
+        lower_og = og_image_url.lower()
+        if "/wp-content/uploads/" in lower_og and not any(keyword in lower_og for keyword in excluded_keywords):
+            seen.add(og_image_url)
+            image_urls.append(og_image_url)
+
+    for img in soup.select("main img, .elementor-widget-image img, img"):
+        src = img.get("src") or img.get("data-src")
+        if not src:
+            continue
+
+        absolute_src = urljoin(url, src)
+        lower_src = absolute_src.lower()
+
+        if absolute_src in seen:
+            continue
+        if "/wp-content/uploads/" not in lower_src:
+            continue
+        if not lower_src.endswith((".webp", ".png", ".jpg", ".jpeg")):
+            continue
+        if any(keyword in lower_src for keyword in excluded_keywords):
+            continue
+
+        seen.add(absolute_src)
+        image_urls.append(absolute_src)
+
+    return image_urls
+
+
+def _extract_winery_video_urls(soup, url):
+    video_urls = []
+    seen = set()
+
+    for selector in ["video source", "video", "iframe", "a[href]"]:
+        for node in soup.select(selector):
+            candidate = node.get("src") or node.get("href")
+            if not candidate:
+                continue
+
+            absolute_url = urljoin(url, candidate)
+            lower_url = absolute_url.lower()
+
+            is_video = (
+                lower_url.endswith((".mp4", ".webm", ".mov", ".m4v"))
+                or "youtube.com" in lower_url
+                or "youtu.be" in lower_url
+                or "vimeo.com" in lower_url
+                or "video" in lower_url
+            )
+            if not is_video:
+                continue
+            if absolute_url in seen:
+                continue
+
+            seen.add(absolute_url)
+            video_urls.append(absolute_url)
+
+    return video_urls
+
+# ----------- WINERY PAGE PARSER -----------
+def parse_winery_page(soup, url, page_type):
+    title = None
+
+    og_title = soup.select_one('meta[property="og:title"]')
+    if og_title and og_title.get("content"):
+        title = _clean_text(og_title.get("content"))
+
+    if not title:
+        page_title = soup.find("title")
+        if page_title:
+            raw_title = _clean_text(page_title.get_text(" ", strip=True))
+            if raw_title:
+                title = raw_title.split("|")[0].strip()
+
+    page_text = _extract_page_text(soup)
+    image_urls = _extract_winery_image_urls(soup, url)
+    video_urls = _extract_winery_video_urls(soup, url)
+
+    return {
+        "page_type": page_type,
+        "title": title,
+        "page_text": page_text,
+        "image_urls": image_urls,
+        "video_urls": video_urls,
+        "source_url": url,
+    }
+
 
 
 def _extract_key_value_details(soup):

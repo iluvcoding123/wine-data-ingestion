@@ -21,6 +21,12 @@ def create_tables():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         website_url TEXT,
+        history_text TEXT,
+        family_spirit_text TEXT,
+        vineyard_text TEXT,
+        vine_to_wine_text TEXT,
+        cellar_text TEXT,
+        commitment_text TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """)
@@ -50,11 +56,13 @@ def create_tables():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS media (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        winery_id INTEGER,
         product_id INTEGER,
         media_type TEXT NOT NULL,
         media_url TEXT NOT NULL,
         source_page_url TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (winery_id) REFERENCES wineries(id),
         FOREIGN KEY (product_id) REFERENCES products(id)
     );
     """)
@@ -68,16 +76,50 @@ def insert_winery(name, website_url=None):
     cursor = conn.cursor()
 
     cursor.execute("""
-    INSERT INTO wineries (name, website_url)
+    INSERT OR IGNORE INTO wineries (name, website_url)
     VALUES (?, ?)
     """, (name, website_url))
 
     conn.commit()
-    winery_id = cursor.lastrowid
+
+    cursor.execute("""
+    SELECT id FROM wineries WHERE name = ?
+    """, (name,))
+    winery_id = cursor.fetchone()[0]
+
     conn.close()
 
     print(f"Inserted winery: {name}")
     return winery_id
+
+
+def update_winery_content(winery_id, winery_data):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    UPDATE wineries
+    SET history_text = ?,
+        family_spirit_text = ?,
+        vineyard_text = ?,
+        vine_to_wine_text = ?,
+        cellar_text = ?,
+        commitment_text = ?
+    WHERE id = ?
+    """, (
+        winery_data.get("history_text"),
+        winery_data.get("family_spirit_text"),
+        winery_data.get("vineyard_text"),
+        winery_data.get("vine_to_wine_text"),
+        winery_data.get("cellar_text"),
+        winery_data.get("commitment_text"),
+        winery_id,
+    ))
+
+    conn.commit()
+    conn.close()
+
+    print("Updated winery content")
 
 
 def insert_product(winery_id, product_data):
@@ -128,14 +170,14 @@ def insert_product(winery_id, product_data):
     return product_id
 
 
-def insert_media(product_id, media_type, media_url, source_page_url=None):
+def insert_media(media_type, media_url, source_page_url=None, winery_id=None, product_id=None):
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
-    INSERT INTO media (product_id, media_type, media_url, source_page_url)
-    VALUES (?, ?, ?, ?)
-    """, (product_id, media_type, media_url, source_page_url))
+    INSERT INTO media (winery_id, product_id, media_type, media_url, source_page_url)
+    VALUES (?, ?, ?, ?, ?)
+    """, (winery_id, product_id, media_type, media_url, source_page_url))
 
     conn.commit()
     conn.close()
