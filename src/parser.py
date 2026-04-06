@@ -8,6 +8,7 @@ def _clean_text(text: str | None) -> str | None:
     return cleaned or None
 
 
+
 def _normalize_detail_key(text: str | None) -> str | None:
     cleaned = _clean_text(text)
     if not cleaned:
@@ -15,6 +16,39 @@ def _normalize_detail_key(text: str | None) -> str | None:
     normalized = cleaned.lower().replace(":", "").replace(".", "")
     normalized = " ".join(normalized.split())
     return normalized
+
+
+# Winery text noise filter
+def _is_winery_noise(text: str | None) -> bool:
+    cleaned = _clean_text(text)
+    if not cleaned:
+        return True
+
+    text_lower = cleaned.lower()
+    noise_patterns = [
+        "discover our collections",
+        "jojo's champagne bar",
+        "jojos champagne bar",
+        "terms and conditions of sale",
+        "legal information",
+        "privacy policy",
+        "cookie policy",
+        "we use cookies",
+        "alcohol abuse is dangerous",
+        "to access the joseph perrier website",
+        "please enter your date of birth",
+        "newsletter",
+        "sign up",
+        "@champagnejosephperrier",
+        "where to find us",
+        "my account",
+        "vintage of the month",
+        "sale of alcoholic beverages to minors",
+        "code de la santé publique",
+        "joseph perrier 2025",
+    ]
+
+    return any(pattern in text_lower for pattern in noise_patterns)
 
 
 # Helper to provide include patterns for images based on product URL slug
@@ -137,6 +171,8 @@ def _extract_page_text(soup):
             if not text:
                 continue
             if len(text) < 20:
+                continue
+            if _is_winery_noise(text):
                 continue
             if text in seen:
                 continue
