@@ -1,4 +1,4 @@
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 
 def _clean_text(text: str | None) -> str | None:
@@ -8,30 +8,88 @@ def _clean_text(text: str | None) -> str | None:
     return cleaned or None
 
 
-def _extract_image_urls(soup):
+# Helper to provide include patterns for images based on product URL slug
+def _image_include_patterns_for_url(url: str) -> list[str]:
+    slug = url.rstrip("/").split("/")[-1].lower()
+
+    mapping = {
+        "cuvee-royale-brut": ["brut-royal", "brut_royal"],
+        "cuvee-royale-brut-nature": ["nature"],
+        "cuvee-royale-brut-blanc-de-blancs": ["blanc-de-blancs", "blanc_de_blancs"],
+        "cuvee-royale-demi-sec": ["demi-sec", "demi_sec"],
+        "cuvee-royale-vintage-2009": ["crv2009", "2009"],
+        "cuvee-royale-vintage-2012": ["crv2012", "2012"],
+        "cuvee-royale-vintage-2013": ["crv2013", "2013"],
+        "cuvee-royale-vintage-2018": ["vintage", "2018"],
+        "josephine-2014": ["josephine", "jo2014", "2014"],
+        "josephine-2008": ["josephine", "jo2008", "2008"],
+        "la-cote-a-bras-2008": ["cab2008", "la-cab", "cote-a-bras", "2008"],
+        "la-cote-a-bras-2009": ["cab2009", "cab200920102011", "la-cab", "cote-a-bras", "2009"],
+        "la-cote-a-bras-2012": ["cab2012", "la-cab", "cote-a-bras", "2012"],
+        "la-cote-a-bras-2013": ["la-cab", "cote-a-bras", "2013"],
+        "la-cote-a-bras-2016": ["la-cab", "cote-a-bras", "2016"],
+    }
+
+    return mapping.get(slug, [])
+
+
+def _extract_image_urls(soup, url):
     image_urls = []
     seen = set()
+    include_patterns = _image_include_patterns_for_url(url)
 
-    # Primary: target the specific Elementor widget container for the main product image
-    for img in soup.select('div[data-id="0a1830f"] img'):
+    excluded_keywords = [
+        "patrimoine",
+        "savoir-faire",
+        "actu",
+        "logo",
+        "james-suckling",
+        "wine-enthusiast",
+        "drink-business",
+        "bettane",
+        "bernard-burtschy",
+        "decanter",
+        "dwwa",
+        "le-point",
+        "transparentes",
+        "xavier-lavictoire",
+        "magnum-cuvee-200",
+        "jeroboam-cuvee-200",
+        "le-ciergelot",
+        "versionheader",
+        "header",
+    ]
+
+    og_image = soup.select_one('meta[property="og:image"]')
+    if og_image and og_image.get("content"):
+        og_image_url = urljoin(url, og_image.get("content"))
+        lower_og = og_image_url.lower()
+        if not any(keyword in lower_og for keyword in excluded_keywords):
+            if not include_patterns or any(pattern in lower_og for pattern in include_patterns):
+                seen.add(og_image_url)
+                image_urls.append(og_image_url)
+
+    for img in soup.select("img.wvs-archive-product-image, .elementor-widget-image img"):
         src = img.get("src") or img.get("data-src")
-        if not src or src in seen:
+        if not src:
             continue
-        seen.add(src)
-        image_urls.append(src)
 
-    # Fallback: if nothing found, use class-based filter but restrict to current cuvée
-    if not image_urls:
-        for img in soup.select("img.wvs-archive-product-image"):
-            src = img.get("src") or img.get("data-src")
-            if not src:
-                continue
-            if "blanc-de-blancs" not in src.lower():
-                continue
-            if src in seen:
-                continue
-            seen.add(src)
-            image_urls.append(src)
+        absolute_src = urljoin(url, src)
+        lower_src = absolute_src.lower()
+
+        if absolute_src in seen:
+            continue
+        if "/wp-content/uploads/" not in lower_src:
+            continue
+        if not lower_src.endswith((".webp", ".png", ".jpg", ".jpeg")):
+            continue
+        if any(keyword in lower_src for keyword in excluded_keywords):
+            continue
+        if include_patterns and not any(pattern in lower_src for pattern in include_patterns):
+            continue
+
+        seen.add(absolute_src)
+        image_urls.append(absolute_src)
 
     return image_urls
 
@@ -83,6 +141,39 @@ def _extract_key_value_details(soup):
     return details
 
 
+def extract_product_links(soup):
+    product_links = []
+    seen = set()
+
+    for link in soup.select("a[href]"):
+        href = link.get("href", "").strip()
+        if not href:
+            continue
+
+        absolute_url = urljoin("https://www.josephperrier.com", href)
+        parsed = urlparse(absolute_url)
+        path = parsed.path.rstrip("/")
+
+        if "/en/champagnes-et-cuvees/" not in path:
+            continue
+
+        if path == "/en/champagnes-et-cuvees":
+            continue
+
+        relative_part = path.replace("/en/champagnes-et-cuvees/", "", 1).strip("/")
+        if not relative_part or "/" in relative_part:
+            continue
+
+        normalized_url = f"https://www.josephperrier.com{path}/"
+        if normalized_url in seen:
+            continue
+
+        seen.add(normalized_url)
+        product_links.append(normalized_url)
+
+    return product_links
+
+
 def parse_product_page(soup, url):
     title = None
 
@@ -107,7 +198,7 @@ def parse_product_page(soup, url):
         if description_node:
             description = _clean_text(description_node.get_text(" ", strip=True))
 
-    image_urls = [urljoin(url, img_url) for img_url in _extract_image_urls(soup)]
+    image_urls = _extract_image_urls(soup, url)
     details = _extract_key_value_details(soup)
     datasheet_url = _extract_datasheet_url(soup)
     if datasheet_url:
