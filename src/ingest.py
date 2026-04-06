@@ -21,10 +21,12 @@ PAGE_TYPE_TO_FIELD = {
 
 
 def main():
+    # 1. create tables
     create_tables()
-
+    # 2. insert winery and get winery_id
     winery_id = insert_winery("Joseph Perrier", BASE_URL)
 
+    # 3. for each winery page, parse content and update winery record
     winery_data = {
         "history_text": None,
         "family_spirit_text": None,
@@ -36,6 +38,7 @@ def main():
 
     print(f"Starting winery-level ingestion for {len(WINERY_PAGES)} pages...")
 
+    # 4. for each product page, parse content and insert product record linked to winery
     for page_type, page_url in WINERY_PAGES.items():
         print(f"Processing winery page: {page_type} -> {page_url}")
         soup = get_soup(page_url)
@@ -64,10 +67,12 @@ def main():
                 winery_id=winery_id,
             )
 
+    # 5. after processing all winery pages, update winery record with parsed content
     update_winery_content(winery_id, winery_data)
 
     print(f"Starting product-level ingestion for {len(PRODUCT_URLS)} product pages...")
 
+    # 6. for each product page, parse content and insert product record linked to winery
     for product_url in PRODUCT_URLS:
         print(f"Processing product page: {product_url}")
         soup = get_soup(product_url)
