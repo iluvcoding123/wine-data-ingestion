@@ -8,6 +8,15 @@ def _clean_text(text: str | None) -> str | None:
     return cleaned or None
 
 
+def _normalize_detail_key(text: str | None) -> str | None:
+    cleaned = _clean_text(text)
+    if not cleaned:
+        return None
+    normalized = cleaned.lower().replace(":", "").replace(".", "")
+    normalized = " ".join(normalized.split())
+    return normalized
+
+
 # Helper to provide include patterns for images based on product URL slug
 def _image_include_patterns_for_url(url: str) -> list[str]:
     slug = url.rstrip("/").split("/")[-1].lower()
@@ -257,23 +266,22 @@ def _extract_key_value_details(soup):
 
     heading_nodes = soup.select("p.elementor-heading-title")
     for i in range(len(heading_nodes) - 1):
-        key = _clean_text(heading_nodes[i].get_text(" ", strip=True))
+        key = _normalize_detail_key(heading_nodes[i].get_text(" ", strip=True))
         value = _clean_text(heading_nodes[i + 1].get_text(" ", strip=True))
         if not key or not value:
             continue
 
-        key_lower = key.lower()
-        if key_lower in {
+        if key in {
             "chardonnay",
             "pinot noir",
             "pinot meunier",
             "operating temperature",
             "ageing potential",
         }:
-            details[key_lower] = value
+            details[key] = value
 
     for container in soup.select(".elementor-widget-text-editor .elementor-widget-container"):
-        children = [child for child in container.find_all(["h5", "h6"], recursive=False)]
+        children = container.find_all(["h5", "h6"])
         current_key = None
         for child in children:
             tag_name = child.name.lower()
@@ -282,7 +290,7 @@ def _extract_key_value_details(soup):
                 continue
 
             if tag_name == "h5":
-                current_key = text.lower()
+                current_key = _normalize_detail_key(text)
             elif tag_name == "h6" and current_key:
                 details[current_key] = text
                 current_key = None
@@ -359,6 +367,18 @@ def parse_product_page(soup, url):
             grape_parts.append(f"{grape.title()} {details[grape]}")
     grape_varieties = ", ".join(grape_parts) if grape_parts else None
 
+    aging = (
+        details.get("aging")
+        or details.get("vieillissement")
+    )
+
+    reserve_wines = (
+        details.get("reserve wines")
+        or details.get("vins de réserve")
+        or details.get("vins de réserves")
+        or details.get("réserve")
+    )
+
     return {
         "name": title,
         "product_url": url,
@@ -368,8 +388,8 @@ def parse_product_page(soup, url):
         "grape_varieties": grape_varieties,
         "operating_temperature": details.get("operating temperature"),
         "ageing_potential": details.get("ageing potential"),
-        "aging": details.get("aging"),
-        "reserve_wines": details.get("reserve wines"),
+        "aging": aging,
+        "reserve_wines": reserve_wines,
         "dosage": details.get("dosage"),
         "crus_assembles": details.get("crus assemblés") or details.get("crus assembles"),
     }
