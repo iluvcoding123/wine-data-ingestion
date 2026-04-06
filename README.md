@@ -60,5 +60,6 @@ python -m src.ingest
 ## Notes
 
 - Product and winery URL discovery was partially seeded due to site routing behavior under non-browser requests.
-- Some fields are page-dependent and may be null when a page does not expose that attribute in a consistent structure.
+- Structured field extraction was improved with multilingual label normalization, but some fields remain null because page structure varies across product families.
+- Winery media extraction is broader than product media extraction and still includes some repeated site assets.
 - The resulting database can be inspected with DB Browser for SQLite.

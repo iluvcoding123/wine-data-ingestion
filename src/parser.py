@@ -277,6 +277,17 @@ def _extract_key_value_details(soup):
             "pinot meunier",
             "operating temperature",
             "ageing potential",
+            "aging",
+            "vieillissement",
+            "dosage",
+            "crus assemblés",
+            "crus assembles",
+            "reserve wines",
+            "vins de réserve",
+            "vins de réserves",
+            "réserve",
+            "millésime",
+            "millennium",
         }:
             details[key] = value
 
@@ -294,6 +305,22 @@ def _extract_key_value_details(soup):
             elif tag_name == "h6" and current_key:
                 details[current_key] = text
                 current_key = None
+
+    # Fallback: catch loose key-value patterns in paragraphs
+    for node in soup.select("p"):
+        text = _clean_text(node.get_text(" ", strip=True))
+        if not text or ":" not in text:
+            continue
+
+        parts = text.split(":", 1)
+        key = _normalize_detail_key(parts[0])
+        value = _clean_text(parts[1])
+
+        if not key or not value:
+            continue
+
+        if key not in details:
+            details[key] = value
 
     return details
 
